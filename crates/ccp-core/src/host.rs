@@ -262,6 +262,11 @@ fn run_bundle(
             None => match open_device(e) {
                 Ok(d) => d,
                 Err(err) => {
+                    log_ev(
+                        log,
+                        &LogEvent::now(&spec.name, &e.name, "error")
+                            .with_detail(format!("open failed: {err}")),
+                    );
                     return Err(Error::Router(format!(
                         "endpoint `{}` open failed: {err}",
                         e.name
@@ -356,8 +361,10 @@ fn run_bundle(
 /// 阻塞直到 stop 被置位。返回各 bundle 的最终状态。
 pub fn run_session(config: &SessionConfig, log: &SharedLog, stop: &StopFlag) -> Vec<BundleStatus> {
     let mut joins = Vec::new();
+    let mut names = Vec::new();
     for spec in &config.bundles {
         let spec = spec.clone();
+        names.push(spec.name.clone());
         let log = Arc::clone(log);
         let stop = stop.clone();
         joins.push(std::thread::Builder::new()
@@ -366,17 +373,17 @@ pub fn run_session(config: &SessionConfig, log: &SharedLog, stop: &StopFlag) -> 
             .expect("spawn bundle thread"));
     }
     let mut out = Vec::new();
-    for j in joins {
+    for (j, name) in joins.into_iter().zip(names) {
         match j.join() {
             Ok(Ok(status)) => out.push(status),
             Ok(Err(e)) => out.push(BundleStatus {
-                name: "?".into(),
+                name,
                 endpoints: vec![],
                 ok: false,
                 detail: e.to_string(),
             }),
             Err(_) => out.push(BundleStatus {
-                name: "?".into(),
+                name,
                 endpoints: vec![],
                 ok: false,
                 detail: "bundle thread panicked".into(),
