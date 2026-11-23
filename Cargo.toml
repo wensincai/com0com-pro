@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/ccp-core", "crates/ccp-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+authors = ["com0com-pro contributors"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
