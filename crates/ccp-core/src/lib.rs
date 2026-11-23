@@ -16,7 +16,9 @@ pub mod config;
 pub mod endpoint;
 pub mod engine;
 pub mod error;
+pub mod host;
 pub mod log;
+pub mod pair;
 pub mod router;
 pub mod setupc;
 
@@ -26,6 +28,8 @@ pub use config::{
 pub use endpoint::{Endpoint, MemoryEndpoint};
 pub use engine::BundleEngine;
 pub use error::{Error, Result};
+pub use host::{list_serial_ports, run_session, shared_log_to, BundleStatus, SharedLog, StopFlag};
 pub use log::{ActivityLog, LogEvent};
+pub use pair::PairManager;
 pub use router::{RoutePolicy, Router};
-pub use setupc::{PortPair, parse_pairs_output};
+pub use setupc::{parse_pairs_output, PortPair};

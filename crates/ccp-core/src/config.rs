@@ -12,8 +12,10 @@ use std::path::{Path, PathBuf};
 pub enum EndpointKind {
     /// com0com 虚拟口或真实 COM 口（如 "CNCA0"、"COM3"）。
     Port { port: String },
-    /// 命名管道（本机测试/应用接入）。
+    /// 命名管道（P4/IPC 阶段实现）。
     Pipe { path: String },
+    /// TCP 端点（host:port；用于 E2E 测试与网络串口桥）。
+    Tcp { addr: String },
 }
 
 /// 端点规格。

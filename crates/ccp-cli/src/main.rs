@@ -1,9 +1,9 @@
 //! ccp.exe — com0com-pro 命令行工具。
 //!
-//! P2 范围：配置校验、示例生成、setupc 端口对列表解析。
-//! P3 追加：pair 管理（调 setupc）、bundle 实机运行（串口/管道泵）。
+//! 子命令：init / validate / list / pair / serve（P3）。
+//! 服务安装（P4）见 ccp-service。
 
-use ccp_core::{parse_pairs_output, SessionConfig};
+use ccp_core::{PairManager, SessionConfig};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -33,9 +33,60 @@ enum Command {
     },
     /// 解析 setupc list 输出（从 stdin 读入或调本机 setupc.exe）
     List {
-        /// setupc.exe 路径（缺省从 PATH 查找）
+        /// setupc.exe 路径（缺省从常见路径查找）
         #[arg(long)]
         setupc: Option<PathBuf>,
+    },
+    /// 管理本机 com0com 端口对（经 setupc.exe）
+    Pair {
+        #[command(subcommand)]
+        op: PairOp,
+    },
+    /// 实机运行配置中的全部 bundle（Ctrl+C 停止）
+    Serve {
+        /// 配置文件路径
+        config: PathBuf,
+        /// 活动日志输出路径（缺省 ccp-activity.jsonl）
+        #[arg(long, default_value = "ccp-activity.jsonl")]
+        log: PathBuf,
+    },
+    /// 枚举本机串口
+    Ports,
+}
+
+#[derive(Subcommand)]
+enum PairOp {
+    /// 列出端口对
+    List,
+    /// 安装端口对：`ccp pair install - -` 或 `ccp pair install 0 0`
+    Install {
+        /// A 侧编号（"-" 自动分配）
+        a: String,
+        /// B 侧编号（"-" 自动分配）
+        b: String,
+    },
+    /// 删除端口对
+    Remove {
+        /// 端口对编号
+        index: String,
+    },
+    /// 修改端口参数（如 `ccp pair change CNCA0 EmuBR=yes`）
+    Change {
+        /// 端口名（CNCA0/CNCB0/COM…）
+        port: String,
+        /// 参数（如 EmuBR=yes）
+        param: String,
+    },
+    /// 幂等确保端口对存在（缺失则安装）
+    Ensure {
+        /// 端口对编号
+        index: String,
+        /// A 侧参数（可多次）
+        #[arg(long)]
+        a: Vec<String>,
+        /// B 侧参数（可多次）
+        #[arg(long)]
+        b: Vec<String>,
     },
 }
 
@@ -72,7 +123,7 @@ fn main() {
             }
         }
         Command::List { setupc } => match run_setupc_list(setupc.as_ref()) {
-            Ok(text) => match parse_pairs_output(&text) {
+            Ok(text) => match ccp_core::parse_pairs_output(&text) {
                 Ok(pairs) => {
                     for p in &pairs {
                         println!(
@@ -95,6 +146,102 @@ fn main() {
                 std::process::exit(1);
             }
         },
+        Command::Ports => match ccp_core::list_serial_ports() {
+            Ok(ports) => {
+                if ports.is_empty() {
+                    println!("(no serial ports)");
+                }
+                for p in &ports {
+                    println!("{p}");
+                }
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        },
+        Command::Pair { op } => {
+            let Some(pm) = setupc_manager(None) else {
+                eprintln!("setupc.exe not found; install com0com or check PATH");
+                std::process::exit(1);
+            };
+            let res = match &op {
+                PairOp::List => pm.list().map(|pairs| {
+                    for p in &pairs {
+                        println!(
+                            "{} <-> {}   A[{}] B[{}]",
+                            p.cnca, p.cncb, p.cnca_params, p.cncb_params
+                        );
+                    }
+                    println!("{} pair(s)", pairs.len());
+                }),
+                PairOp::Install { a, b } => pm.install(a, b).map(|o| print!("{o}")),
+                PairOp::Remove { index } => pm.remove(index).map(|o| print!("{o}")),
+                PairOp::Change { port, param } => pm.change(port, param).map(|o| print!("{o}")),
+                PairOp::Ensure { index, a, b } => {
+                    let a_ref: Vec<&str> = a.iter().map(|s| s.as_str()).collect();
+                    let b_ref: Vec<&str> = b.iter().map(|s| s.as_str()).collect();
+                    pm.ensure_pair(index, Some(&a_ref.join(",")), Some(&b_ref.join(",")))
+                        .map(|created| {
+                            println!(
+                                "{}",
+                                if created {
+                                    "created"
+                                } else {
+                                    "already exists"
+                                }
+                            )
+                        })
+                }
+            };
+            if let Err(e) = res {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        Command::Serve { config, log } => {
+            let cfg = match SessionConfig::load(&config) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("invalid config: {e}");
+                    std::process::exit(2);
+                }
+            };
+            let shared_log = match ccp_core::shared_log_to(&log) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("cannot open activity log {}: {e}", log.display());
+                    std::process::exit(1);
+                }
+            };
+            let stop = ccp_core::StopFlag::default();
+            ctrlc::set_handler({
+                let stop = stop.clone();
+                move || stop.stop()
+            })
+            .expect("install Ctrl+C handler");
+            println!(
+                "serving {} bundle(s); Ctrl+C to stop; activity log: {}",
+                cfg.bundles.len(),
+                log.display()
+            );
+            let statuses = ccp_core::run_session(&cfg, &shared_log, &stop);
+            for s in &statuses {
+                println!(
+                    "[{}] {} ({})",
+                    if s.ok { "OK" } else { "FAIL" },
+                    s.name,
+                    s.detail
+                );
+            }
+        }
+    }
+}
+
+fn setupc_manager(explicit: Option<&PathBuf>) -> Option<PairManager> {
+    match explicit {
+        Some(p) => Some(PairManager::new(p)),
+        None => PairManager::discover(),
     }
 }
 

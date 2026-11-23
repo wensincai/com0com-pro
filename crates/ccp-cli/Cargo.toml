@@ -13,3 +13,4 @@ path = "src/main.rs"
 ccp-core = { path = "../ccp-core" }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
+ctrlc = "3"
