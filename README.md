@@ -19,40 +19,69 @@
 | [docs/02-代码分析.md](docs/02-代码分析.md) | com0com 源码结构、复用/改造/新建决策 |
 | [docs/03-技术选型.md](docs/03-技术选型.md) | 驱动保持 C/WDM、控制面选 Rust 的论证 |
 | [docs/04-架构设计.md](docs/04-架构设计.md) | 控制面/数据面分离、bundle 拓扑模型、测试策略 |
+| [docs/05-驱动增强说明.md](docs/05-驱动增强说明.md) | P5 强删已打开端口：机制、开启方法、风险与 VM 验证计划 |
 
-## 当前状态（P2 完成）
+## 当前状态（P1–P5 完成）
 
-- **ccp-core**（库）：端点抽象（`Endpoint` trait + 内存测试端点）、bundle 路由器
-  （`OneToOne` / `CopyAll` / `RoundRobin` / `FirstWriterWins` 四种策略）、
-  配置模型（bundles.json）、JSONL 活动日志、setupc 输出解析器
-- **ccp-cli**（`ccp.exe`）：`init`（生成示例配置）/ `validate` / `list`（解析本机 setupc 端口对）
-- **测试**：`cargo test --workspace` 29 项全绿；`cargo clippy` 0 警告
-- 基础驱动代码：`E:\reverseEngineering\20261112\com0com`（VS2022+WDK 迁移完成，测试签名通过，见其 MIGRATION-REPORT.md）
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| P1 | 需求分析 / 代码分析 / 技术选型 / 架构设计 | ✅ |
+| P2 | ccp-core 路由引擎（四策略）+ 配置 + 日志 + setupc 解析 | ✅ 36 项单测 |
+| P3 | 实机端点（串口/TCP）+ 泵线程宿主 + PairManager + CLI serve/pair | ✅ |
+| P4 | ccp-service（SCM 服务）+ ccp-gui（egui 管理界面） | ✅ 可构建 |
+| P5 | 驱动强删已打开端口（默认关闭，需 VM 验证） | ✅ 编译通过 |
+
+- **4 个 crate**：`ccp-core`（库）、`ccp-cli`（ccp.exe）、`ccp-service`（Windows 服务）、`ccp-gui`（egui）
+- **质量**：`cargo test --workspace` 36 项绿 / 1 项手动 ignored；`cargo clippy` 0 警告
+- **驱动**：com0com 目录 `build.cmd` 通过（VS2022 + WDK 10.0.26100），含 P5 改动
 
 ## 构建
 
 ```bat
-cargo build --release        :: target\release\ccp.exe
-cargo test --workspace       :: 29 项单测（内存端点，无需真实串口）
+cargo build --release        :: target\release\{ccp,ccp-service,ccp-gui}.exe
+cargo test --workspace       :: 36 项单测（内存设备，无需真实串口/驱动）
 ```
-
-驱动构建：在 com0com 目录执行 `build.cmd`（需要 VS2022 + WDK 10.0.26100）。
 
 ## 快速体验
 
 ```bat
-ccp init sample-bundles.json          :: 生成示例（gps-split、tool-link）
-ccp validate sample-bundles.json      :: 校验拓扑
-ccp list                              :: 列出本机 com0com 端口对（需装 com0com）
+ccp init bundles.json                 :: 生成示例（split + redirect）
+ccp validate bundles.json             :: 校验拓扑
+ccp ports                             :: 枚举本机串口
+ccp pair list                         :: 列出 com0com 端口对（需装 com0com）
+ccp pair ensure 0 --a EmuBR=yes --b EmuOverrun=yes   :: 幂等创建端口对
+ccp serve bundles.json                :: 实机运行全部 bundle，Ctrl+C 停止
+ccp service install                   :: 安装开机自启服务（管理员）
+ccp-gui                               :: 图形界面：bundle 编辑 / 端口 / 活动日志
 ```
+
+配置文件格式（`bundles.json`）：
+
+```json
+{
+  "bundles": [
+    {
+      "name": "gps-split",
+      "kind": "split",
+      "inlets":  [{ "name": "gps", "type": "port", "port": "COM3" }],
+      "outlets": [{ "name": "nav", "type": "port", "port": "CNCA0" },
+                  { "name": "log", "type": "port", "port": "CNCA1" }]
+    }
+  ]
+}
+```
+
+`kind`：`split` / `merge` / `share` / `redirect` / `complex`；端点 `type`：`port` / `tcp` / `pipe`（pipe 待 P6）。
+策略缺省：split=copy-all、merge=round-robin、share=first-writer-wins:1000、redirect=one-to-one。
 
 ## 里程碑
 
-- [x] **P1** 文档与选型（本仓库 docs/）
-- [x] **P2** bundle 引擎核心（ccp-core：路由器/配置/日志/解析器 + 29 项单测）
-- [ ] **P3** CLI 实机运行：SerialEndpoint（serialport crate）+ PairManager（调 setupc.exe）+ bundle 实跑
-- [ ] **P4** Windows 服务（开机重建）+ egui 管理界面
-- [ ] **P5** 驱动小改：强删已打开端口、按会话端口
+- [x] **P1** 文档与选型
+- [x] **P2** bundle 引擎核心
+- [x] **P3** 实机运行（串口/TCP 端点、PairManager、CLI）
+- [x] **P4** Windows 服务 + egui 管理界面
+- [x] **P5** 驱动强删已打开端口（默认关闭，待 VM 验证）
+- [ ] **P6** 命名管道端点与 JSON-RPC API、按会话端口、NSIS 打包、性能压测
 
 ## 许可证
 

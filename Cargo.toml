@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/ccp-core", "crates/ccp-cli"]
+members = ["crates/ccp-core", "crates/ccp-cli", "crates/ccp-service", "crates/ccp-gui"]
 
 [workspace.package]
 version = "0.1.0"

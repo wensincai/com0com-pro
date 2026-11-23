@@ -52,6 +52,28 @@ enum Command {
     },
     /// 枚举本机串口
     Ports,
+    /// 管理 ccp-service Windows 服务（sc.exe）
+    Service {
+        #[command(subcommand)]
+        op: ServiceOp,
+    },
+}
+
+#[derive(Subcommand)]
+enum ServiceOp {
+    /// 安装并启动服务（需管理员）
+    Install {
+        /// ccp-service.exe 路径（缺省为 ccp.exe 同目录）
+        #[arg(long)]
+        exe: Option<PathBuf>,
+        /// 服务自动启动（缺省 true）
+        #[arg(long, default_value_t = true)]
+        auto: bool,
+    },
+    /// 停止并删除服务（需管理员）
+    Uninstall,
+    /// 查询服务状态
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -199,6 +221,12 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Command::Service { op } => {
+            if let Err(e) = handle_service(&op) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
         Command::Serve { config, log } => {
             let cfg = match SessionConfig::load(&config) {
                 Ok(c) => c,
@@ -242,6 +270,63 @@ fn setupc_manager(explicit: Option<&PathBuf>) -> Option<PairManager> {
     match explicit {
         Some(p) => Some(PairManager::new(p)),
         None => PairManager::discover(),
+    }
+}
+
+fn handle_service(op: &ServiceOp) -> Result<(), String> {
+    use std::process::Command;
+    const NAME: &str = "ccp-service";
+    let sc = |args: &[&str]| -> Result<String, String> {
+        let out = Command::new("sc.exe")
+            .args(args)
+            .output()
+            .map_err(|e| format!("run sc.exe: {e}"))?;
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        if !out.status.success() {
+            return Err(format!("sc {} failed:\n{text}", args.join(" ")));
+        }
+        Ok(text)
+    };
+    match op {
+        ServiceOp::Install { exe, auto } => {
+            let exe = match exe {
+                Some(p) => p.clone(),
+                None => {
+                    let mut p = std::env::current_exe().map_err(|e| e.to_string())?;
+                    p.set_file_name("ccp-service.exe");
+                    p
+                }
+            };
+            if !exe.exists() {
+                return Err(format!("{} not found (build ccp-service first)", exe.display()));
+            }
+            let bin = format!("\"{}\" --service", exe.display());
+            let start = if *auto { "auto" } else { "demand" };
+            sc(&[
+                "create", NAME, "binPath=", &bin, "start=", start,
+                "DisplayName=", "com0com-pro Bundle Service",
+            ])?;
+            let text = sc(&["start", NAME])?;
+            print!("{text}");
+            println!("service `{NAME}` installed and started");
+            Ok(())
+        }
+        ServiceOp::Uninstall => {
+            let _ = sc(&["stop", NAME]);
+            let text = sc(&["delete", NAME])?;
+            print!("{text}");
+            println!("service `{NAME}` removed");
+            Ok(())
+        }
+        ServiceOp::Status => {
+            let text = sc(&["query", NAME])?;
+            print!("{text}");
+            Ok(())
+        }
     }
 }
 

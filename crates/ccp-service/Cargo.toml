@@ -1,0 +1,16 @@
+[package]
+name = "ccp-service"
+description = "com0com-pro Windows service host (auto-recreate bundles at boot)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ccp-service"
+path = "src/main.rs"
+
+[dependencies]
+ccp-core = { path = "../ccp-core" }
+clap = { version = "4", features = ["derive"] }
+windows-service = "0.8"
+ctrlc = "3"

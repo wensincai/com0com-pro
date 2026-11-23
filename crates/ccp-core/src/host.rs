@@ -106,6 +106,7 @@ enum Device {
     Serial(Box<dyn serialport::SerialPort>),
     Tcp(std::net::TcpStream),
     /// 内存设备（测试用）：读 = 取走 inbox，写 = 追加到 outbox。
+    #[cfg_attr(not(test), allow(dead_code))]
     Memory(Arc<Mutex<MemDev>>),
 }
 
