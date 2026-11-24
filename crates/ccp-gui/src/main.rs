@@ -9,6 +9,9 @@
 //! 设计取舍：P4 阶段 GUI 直接进程内跑引擎（单机管理场景足够），
 //! 命名管道 JSON-RPC（FR-A6）留待与第三方集成时再拆分进程。
 
+// release 构建隐藏控制台窗口（debug 保留便于排错）
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use ccp_core::{
     list_serial_ports, run_session, shared_log_to, BundleKind, BundleSpec, EndpointKind,
     EndpointSpec, PairManager, SessionConfig, StopFlag,
@@ -57,7 +60,8 @@ struct App {
 }
 
 impl App {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        install_cjk_fonts(&cc.egui_ctx);
         let config_path = default_config_path();
         let cfg = SessionConfig::load(&config_path).unwrap_or_default();
         let mut app = Self {
@@ -188,6 +192,35 @@ impl App {
             self.activity = lines;
         }
     }
+}
+
+/// 安装中文字体：egui 默认字体不含 CJK 字形（显示为方块）。
+/// 从 Windows 系统字体目录加载微软雅黑，追加到 Proportional 与
+/// Monospace 两个字族的回退链尾部（拉丁字符仍用 egui 内置字体）。
+fn install_cjk_fonts(ctx: &egui::Context) {
+    let candidates: [&str; 3] = ["msyh.ttc", "simhei.ttf", "simsun.ttc"];
+    let mut loaded: Option<(String, egui::FontData)> = None;
+    for name in candidates {
+        let path = PathBuf::from(r"C:\Windows\Fonts").join(name);
+        if let Ok(bytes) = std::fs::read(&path) {
+            loaded = Some((format!("cjk-{name}"), egui::FontData::from_owned(bytes)));
+            break;
+        }
+    }
+    let Some((loaded_name, data)) = loaded else {
+        // 非 Windows 或缺字体目录：保持默认，英文界面仍可用
+        return;
+    };
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(loaded_name.clone(), data.into());
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+        fonts
+            .families
+            .entry(family)
+            .or_default()
+            .push(loaded_name.clone());
+    }
+    ctx.set_fonts(fonts);
 }
 
 fn endpoint_port(e: &EndpointSpec) -> String {

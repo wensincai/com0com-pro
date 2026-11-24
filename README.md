@@ -21,7 +21,7 @@
 | [docs/04-架构设计.md](docs/04-架构设计.md) | 控制面/数据面分离、bundle 拓扑模型、测试策略 |
 | [docs/05-驱动增强说明.md](docs/05-驱动增强说明.md) | P5 强删已打开端口：机制、开启方法、风险与 VM 验证计划 |
 
-## 当前状态（P1–P5 完成）
+## 当前状态（P1–P6 完成）
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
@@ -30,6 +30,7 @@
 | P3 | 实机端点（串口/TCP）+ 泵线程宿主 + PairManager + CLI serve/pair | ✅ |
 | P4 | ccp-service（SCM 服务）+ ccp-gui（egui 管理界面） | ✅ 可构建 |
 | P5 | 驱动强删已打开端口（默认关闭，需 VM 验证） | ✅ 编译通过 |
+| P6 | NSIS 安装包（驱动+工具+服务+默认端口对） | ✅ |
 
 - **4 个 crate**：`ccp-core`（库）、`ccp-cli`（ccp.exe）、`ccp-service`（Windows 服务）、`ccp-gui`（egui）
 - **质量**：`cargo test --workspace` 36 项绿 / 1 项手动 ignored；`cargo clippy` 0 警告
@@ -40,6 +41,10 @@
 ```bat
 cargo build --release        :: target\release\{ccp,ccp-service,ccp-gui}.exe
 cargo test --workspace       :: 36 项单测（内存设备，无需真实串口/驱动）
+
+:: NSIS 安装包（需 NSIS 3）
+"C:\Program Files (x86)\NSIS\makensis.exe" installer\com0com-pro.nsi
+:: 产物：installer\com0com-pro-setup.exe
 ```
 
 ## 快速体验
