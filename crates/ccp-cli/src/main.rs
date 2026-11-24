@@ -80,12 +80,10 @@ enum ServiceOp {
 enum PairOp {
     /// 列出端口对
     List,
-    /// 安装端口对：`ccp pair install - -` 或 `ccp pair install 0 0`
+    /// 安装端口对：`ccp pair install 0`（编号 "-" 自动分配）
     Install {
-        /// A 侧编号（"-" 自动分配）
-        a: String,
-        /// B 侧编号（"-" 自动分配）
-        b: String,
+        /// 端口对编号（"-" 自动分配）
+        id: String,
     },
     /// 删除端口对
     Remove {
@@ -197,7 +195,7 @@ fn main() {
                     }
                     println!("{} pair(s)", pairs.len());
                 }),
-                PairOp::Install { a, b } => pm.install(a, b).map(|o| print!("{o}")),
+                PairOp::Install { id } => pm.install(id, "-", "-").map(|o| print!("{o}")),
                 PairOp::Remove { index } => pm.remove(index).map(|o| print!("{o}")),
                 PairOp::Change { port, param } => pm.change(port, param).map(|o| print!("{o}")),
                 PairOp::Ensure { index, a, b } => {

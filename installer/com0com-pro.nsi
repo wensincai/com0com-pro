@@ -263,14 +263,13 @@ Function .onInit
     Abort
   ${EndIf}
 
-  ; Default selections: shortcuts on, service off, pair off
+  ; Default selections: shortcuts on, pair on, service off.
+  ; Pair creation is idempotent (ccp pair ensure 0 checks list first),
+  ; so defaulting it ON avoids the "driver installed but no ports" trap.
   SectionGetFlags ${sec_service} $0
   IntOp $1 ${SF_SELECTED} ~
   IntOp $0 $0 & $1
   SectionSetFlags ${sec_service} $0
-  SectionGetFlags ${sec_pair} $0
-  IntOp $0 $0 & $1
-  SectionSetFlags ${sec_pair} $0
 
 FunctionEnd
 

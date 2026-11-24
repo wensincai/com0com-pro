@@ -52,8 +52,12 @@ impl PairManager {
     }
 
     fn run(&self, args: &[&str]) -> Result<String> {
+        let cwd = self.setupc.parent().unwrap_or(Path::new("."));
+        // setupc 用 GetFullPathName("com0com.inf") 按当前工作目录解析 INF，
+        // 必须把 CWD 固定到 setupc.exe 所在目录（INF 与其同目录安装）。
         let out = Command::new(&self.setupc)
             .args(args)
+            .current_dir(cwd)
             .output()
             .map_err(|e| Error::Setupc(format!("run {}: {e}", self.setupc.display())))?;
         let stdout = String::from_utf8_lossy(&out.stdout).to_string();
@@ -75,10 +79,11 @@ impl PairManager {
         parse_pairs_output(&self.run(&["list"])?)
     }
 
-    /// 安装一对端口（index 可为 "-" 自动分配）。
+    /// 安装一对端口：`install <id> <PortParamsA> <PortParamsB>`，
+    /// 端口参数传 "-" 表示默认（自动分配 COM 号）。
     /// 幂等：同编号已存在时报错由调用方先行 list 检查。
-    pub fn install(&self, a: &str, b: &str) -> Result<String> {
-        self.run(&["install", a, b])
+    pub fn install(&self, id: &str, a_params: &str, b_params: &str) -> Result<String> {
+        self.run(&["install", id, a_params, b_params])
     }
 
     /// 批量安装（--no-update 加速）后统一更新一次。
@@ -88,8 +93,8 @@ impl PairManager {
             outs.push(self.run(&["--no-update", "install", a, b])?);
         }
         if !pairs.is_empty() {
-            // 触发一次全量驱动更新
-            outs.push(self.run(&["install"])?);
+            // 批量安装后触发一次全量驱动更新
+            outs.push(self.run(&["update"])?);
         }
         Ok(outs)
     }
@@ -117,7 +122,7 @@ impl PairManager {
         } else {
             "-".to_string()
         };
-        self.install(&idx, &idx)?;
+        self.install(&idx, "-", "-")?;
         if let Some(p) = a_params {
             self.change(&want_a, p)?;
         }
