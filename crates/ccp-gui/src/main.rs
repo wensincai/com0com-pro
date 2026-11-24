@@ -408,12 +408,13 @@ impl eframe::App for App {
                 if self.setupc_missing {
                     ui.label(
                         egui::RichText::new(
-                            "⚠ 未找到 setupc.exe —— com0com 虚拟串口驱动未安装。\n\
-                             在以下路径均未找到：\n  \
-                             C:\\Program Files (x86)\\com0com\\setupc.exe\n  \
-                             C:\\Program Files\\com0com\\setupc.exe\n\
-                             解决：运行 com0com-pro-setup.exe 勾选\"com0com driver (x64)\"安装；\n\
-                             或先安装官方 com0com 3.0。未装驱动时仍可用 tcp:// 端点体验 bundle。",
+                            "⚠ 未找到 setupc.exe —— 已搜索 com0com-pro / com0com\n\
+                             安装目录、本程序目录与 PATH，均未命中。\n\
+                             解决：运行 com0com-pro-setup.exe 勾选\"com0com driver (x64)\"\n\
+                             安装，或先安装官方 com0com 3.0。\n\
+                             注意：若设备管理器里 com0com 总线设备带黄色感叹号（Code 52），\n\
+                             说明测试签名未开启（bcdedit /set testsigning on 后重启）。\n\
+                             未装驱动时仍可用 tcp:// 端点体验 bundle。",
                         )
                             .color(egui::Color32::from_rgb(220, 160, 60)),
                     );

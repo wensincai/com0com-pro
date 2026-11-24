@@ -21,16 +21,34 @@ impl PairManager {
     }
 
     /// 从常见安装路径与 PATH 查找。
+    ///
+    /// 覆盖三种落点：com0com-pro 安装目录（NSIS 安装器）、旧版 com0com
+    /// 目录（官方 3.0 安装包）、本程序同目录与 PATH（绿色版布局）。
     pub fn discover() -> Option<Self> {
-        let candidates = [
-            r"C:\Program Files (x86)\com0com\setupc.exe",
-            r"C:\Program Files\com0com\setupc.exe",
-        ];
-        candidates
-            .iter()
-            .map(PathBuf::from)
-            .find(|p| p.exists())
-            .map(Self::new)
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        for var in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Ok(dir) = std::env::var(var) {
+                let dir = PathBuf::from(dir);
+                candidates.push(dir.join("com0com-pro").join("setupc.exe"));
+                candidates.push(dir.join("com0com").join("setupc.exe"));
+            }
+        }
+        // 旧版固定路径兜底（环境变量被改过的情况）
+        candidates.push(PathBuf::from(r"C:\Program Files (x86)\com0com\setupc.exe"));
+        candidates.push(PathBuf::from(r"C:\Program Files\com0com\setupc.exe"));
+        // 与本程序同目录（绿色版布局）
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                candidates.push(dir.join("setupc.exe"));
+            }
+        }
+        // PATH 查找
+        if let Ok(path) = std::env::var("PATH") {
+            for dir in std::env::split_paths(&path) {
+                candidates.push(dir.join("setupc.exe"));
+            }
+        }
+        candidates.into_iter().find(|p| p.exists()).map(Self::new)
     }
 
     fn run(&self, args: &[&str]) -> Result<String> {
