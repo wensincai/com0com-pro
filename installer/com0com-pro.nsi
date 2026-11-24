@@ -140,12 +140,38 @@ SectionEnd
 
 ;--------------------------------
 
-Section "com0com driver (x64)" sec_driver
+Section "com0com driver (x64, signed)" sec_driver
 
-  ; Driver files, migrated from com0com x64 build
+  ; Official com0com 3.0.0.0 files from com0com-3.0.0.0-i386-and-x64-signed.zip
+  ; (CyberCircuits / COMODO cross-sign, pre-2015-07-29 cut-off). Loads on
+  ; Windows 11 with Secure Boot ON, provided HVCI (Memory Integrity) is off.
+  SetOutPath "$INSTDIR"
+  File "..\third_party\signed-x64\com0com.sys"
+  File "..\third_party\signed-x64\com0com.cat"
+  File "..\third_party\signed-x64\com0com.inf"
+  File "..\third_party\signed-x64\cncport.inf"
+  File "..\third_party\signed-x64\comport.inf"
+  File "..\third_party\signed-x64\setup.dll"
+  File "..\third_party\signed-x64\setupc.exe"
+
+  ; Driver preinstall / update / inf cleanup (same as original installer)
+  !insertmacro RunSetupc "preinstall"
+  !insertmacro RunSetupc "update"
+  !insertmacro RunSetupc "infclean"
+
+SectionEnd
+
+;--------------------------------
+
+Section /o "com0com driver (force-removal patch, test-signed)" sec_driver_test
+
+  ; Experimental: our P5 build (ForceRemoveOpenPorts registry switch).
+  ; Requires Test Mode (bcdedit /set testsigning on) + reboot, and is
+  ; blocked while Secure Boot is ON. Pick this only if you need force
+  ; removal of ports held open by applications.
   SetOutPath "$INSTDIR"
   File "..\..\com0com\x64\com0com.sys"
-  File /nonfatal "..\..\com0com\x64\com0com.cat"
+  File "..\..\com0com\x64\com0com.cat"
   File "..\..\com0com\x64\com0com.inf"
   File "..\..\com0com\x64\cncport.inf"
   File "..\..\com0com\x64\comport.inf"
@@ -161,12 +187,35 @@ Section "com0com driver (x64)" sec_driver
   nsExec::ExecToLog 'certutil -f -addstore TrustedPublisher "$INSTDIR\com0com-test.cer"'
   Pop $0
 
-  ; Driver preinstall / update / inf cleanup (same as original installer)
   !insertmacro RunSetupc "preinstall"
   !insertmacro RunSetupc "update"
   !insertmacro RunSetupc "infclean"
 
 SectionEnd
+
+;--------------------------------
+
+; The two driver sections are mutually exclusive (both drop com0com.sys
+; into $INSTDIR): selecting one unselects the other.
+Function .onSelChange
+  SectionGetFlags ${sec_driver} $0
+  IntOp $0 $0 & ${SF_SELECTED}
+  ${If} $0 == ${SF_SELECTED}
+    SectionGetFlags ${sec_driver_test} $1
+    IntOp $2 ${SF_SELECTED} ~
+    IntOp $1 $1 & $2
+    SectionSetFlags ${sec_driver_test} $1
+  ${Else}
+    SectionGetFlags ${sec_driver_test} $1
+    IntOp $1 $1 & ${SF_SELECTED}
+    ${If} $1 == ${SF_SELECTED}
+      SectionGetFlags ${sec_driver} $3
+      IntOp $4 ${SF_SELECTED} ~
+      IntOp $3 $3 & $4
+      SectionSetFlags ${sec_driver} $3
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
 
 ;--------------------------------
 
@@ -273,13 +322,15 @@ SectionEnd
 
   ; Language strings
   LangString DESC_sec_tools ${LANG_ENGLISH} "Install ccp.exe / ccp-gui.exe / ccp-service.exe (required)."
-  LangString DESC_sec_driver ${LANG_ENGLISH} "Install the com0com kernel driver (com0com.sys + co-installers)."
+  LangString DESC_sec_driver ${LANG_ENGLISH} "Install the official SIGNED com0com driver (com0com-3.0.0.0-signed). Loads with Secure Boot ON."
+  LangString DESC_sec_driver_test ${LANG_ENGLISH} "Experimental test-signed build with the force-removal patch (ForceRemoveOpenPorts). Requires Test Mode + Secure Boot OFF."
   LangString DESC_sec_shortcuts ${LANG_ENGLISH} "Add shortcuts to the Start Menu."
   LangString DESC_sec_service ${LANG_ENGLISH} "Register ccp-service so bundles are rebuilt automatically at boot."
   LangString DESC_sec_pair ${LANG_ENGLISH} "Create a default linked port pair CNCA0 <-> CNCB0."
 
   LangString DESC_sec_tools ${LANG_SIMPCHINESE} "安装 ccp.exe / ccp-gui.exe / ccp-service.exe（必选）。"
-  LangString DESC_sec_driver ${LANG_SIMPCHINESE} "安装 com0com 内核驱动（com0com.sys 及安装辅助）。"
+  LangString DESC_sec_driver ${LANG_SIMPCHINESE} "安装官方已签名 com0com 驱动（来自官方 signed 发布包）。Secure Boot 开启时也可加载。"
+  LangString DESC_sec_driver_test ${LANG_SIMPCHINESE} "实验版：带强删补丁的测试签名驱动（ForceRemoveOpenPorts）。需要测试签名模式 + 关闭 Secure Boot。"
   LangString DESC_sec_shortcuts ${LANG_SIMPCHINESE} "添加开始菜单快捷方式。"
   LangString DESC_sec_service ${LANG_SIMPCHINESE} "注册 ccp-service，开机自动重建 bundle 配置。"
   LangString DESC_sec_pair ${LANG_SIMPCHINESE} "创建默认互联端口对 CNCA0 <-> CNCB0。"
@@ -287,6 +338,7 @@ SectionEnd
   !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
     !insertmacro MUI_DESCRIPTION_TEXT ${sec_tools} $(DESC_sec_tools)
     !insertmacro MUI_DESCRIPTION_TEXT ${sec_driver} $(DESC_sec_driver)
+    !insertmacro MUI_DESCRIPTION_TEXT ${sec_driver_test} $(DESC_sec_driver_test)
     !insertmacro MUI_DESCRIPTION_TEXT ${sec_shortcuts} $(DESC_sec_shortcuts)
     !insertmacro MUI_DESCRIPTION_TEXT ${sec_service} $(DESC_sec_service)
     !insertmacro MUI_DESCRIPTION_TEXT ${sec_pair} $(DESC_sec_pair)

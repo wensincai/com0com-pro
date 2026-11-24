@@ -3,3 +3,7 @@ obj
 x64
 sample-bundles.json
 installer/com0com-pro-setup.exe
+third_party/signed-x64/
+third_party/com0com-signed.zip
+third_party/Setup_com0com_v3.0.0.0_W7_x64_signed.exe
+third_party/Setup_com0com_v3.0.0.0_W7_x86_signed.exe
