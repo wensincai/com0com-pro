@@ -151,6 +151,15 @@ Section "com0com driver (x64)" sec_driver
   File "..\..\com0com\x64\comport.inf"
   File "..\..\com0com\x64\setup.dll"
   File "..\..\com0com\x64\setupc.exe"
+  File "..\..\com0com\x64\test-sign\com0com-test.cer"
+
+  ; Trust the test-signing certificate: without this, SetupCopyOEMInf fails
+  ; with 0x800B0109 (untrusted root) and UpdateDriverForPlugAndPlayDevices
+  ; fails with error 265 (untrusted publisher).
+  nsExec::ExecToLog 'certutil -f -addstore Root "$INSTDIR\com0com-test.cer"'
+  Pop $0
+  nsExec::ExecToLog 'certutil -f -addstore TrustedPublisher "$INSTDIR\com0com-test.cer"'
+  Pop $0
 
   ; Driver preinstall / update / inf cleanup (same as original installer)
   !insertmacro RunSetupc "preinstall"
