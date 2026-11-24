@@ -407,7 +407,14 @@ impl eframe::App for App {
                 ui.heading("com0com 端口对");
                 if self.setupc_missing {
                     ui.label(
-                        egui::RichText::new("setupc.exe 未找到（未安装 com0com）")
+                        egui::RichText::new(
+                            "⚠ 未找到 setupc.exe —— com0com 虚拟串口驱动未安装。\n\
+                             在以下路径均未找到：\n  \
+                             C:\\Program Files (x86)\\com0com\\setupc.exe\n  \
+                             C:\\Program Files\\com0com\\setupc.exe\n\
+                             解决：运行 com0com-pro-setup.exe 勾选\"com0com driver (x64)\"安装；\n\
+                             或先安装官方 com0com 3.0。未装驱动时仍可用 tcp:// 端点体验 bundle。",
+                        )
                             .color(egui::Color32::from_rgb(220, 160, 60)),
                     );
                 }
