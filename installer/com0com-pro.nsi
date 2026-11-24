@@ -194,7 +194,12 @@ SectionEnd
 
 Section "Create port pair CNCA0 <-> CNCB0" sec_pair
 
-  !insertmacro RunSetupc "install 0 - -"
+  ; Idempotent: ccp pair ensure 0 first checks `setupc list` and only runs
+  ; `install 0 - -` when pair 0 is missing — no "CNCA0 already used" dialogs
+  ; on reinstall (a bare `setupc install 0 - -` would prompt and fall back
+  ; to CNCA1/CNCB1).
+  nsExec::ExecToLog '"$INSTDIR\ccp.exe" pair ensure 0'
+  Pop $0
 
 SectionEnd
 
